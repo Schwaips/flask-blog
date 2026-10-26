@@ -3,6 +3,9 @@ from datetime import datetime
 
 import click
 from flask import current_app, g
+from sqlalchemy import create_engine
+from sqlalchemy.engine import URL
+from sqlalchemy.orm import Session
 
 def get_db():
   if 'db' not in g:
@@ -29,7 +32,16 @@ def init_db():
         db.executescript(f.read().decode('utf8'))
 
 def init_app(app):
+    database_url = URL.create(
+        "sqlite",
+        database=app.config["DATABASE"],
+    ) #-> construit l’adresse de la base SQLite à partir du chemin déjà configuré dans DATABASE
+
+    # équivalent de DB = Sequel.connect("sqlite://blog.db")
+    app.extensions["sqlalchemy_engine"] = create_engine(database_url) # -> crée le moteur. La connexion réelle s’ouvrira lorsqu’une requête sera exécutée.
+
     app.teardown_appcontext(close_db)
+    app.teardown_appcontext(close_session)
     app.cli.add_command(init_db_command)
 
 @click.command('init-db')
@@ -38,6 +50,22 @@ def init_db_command():
     init_db()
     click.echo('Initialized the database.')
 
+def get_engine():
+    return current_app.extensions["sqlalchemy_engine"]
+
+
+def get_session():
+    if "db_session" not in g:
+        g.db_session = Session(get_engine())
+
+    return g.db_session
+
+
+def close_session(error=None):
+    db_session = g.pop("db_session", None)
+
+    if db_session is not None:
+        db_session.close()
 
 sqlite3.register_converter(
     "timestamp", lambda v: datetime.fromisoformat(v.decode())
