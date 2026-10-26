@@ -1,8 +1,12 @@
 import sqlite3
 from datetime import datetime
+from pathlib import Path
 
 import click
+from alembic import command
+from alembic.config import Config
 from flask import current_app, g
+from flask.cli import with_appcontext
 from sqlalchemy import create_engine
 from sqlalchemy.engine import URL
 from sqlalchemy.orm import Session
@@ -26,10 +30,15 @@ def close_db(e=None):
 
 
 def init_db():
-    db = get_db()
+    """Apply pending migrations without clearing existing data."""
+    project_root = Path(current_app.root_path).parent
+    config = Config(str(project_root / "alembic.ini"))
+    # Preserve the logging configuration of the running Flask application.
+    config.attributes["skip_logging_config"] = True
 
-    with current_app.open_resource('schema.sql') as f:
-        db.executescript(f.read().decode('utf8'))
+    with get_engine().begin() as connection:
+        config.attributes["connection"] = connection
+        command.upgrade(config, "head")
 
 def init_app(app):
     database_url = URL.create(
@@ -45,8 +54,9 @@ def init_app(app):
     app.cli.add_command(init_db_command)
 
 @click.command('init-db')
+@with_appcontext
 def init_db_command():
-    """Clear the existing data and create new tables."""
+    """Create or update the database using Alembic migrations; preserve data."""
     init_db()
     click.echo('Initialized the database.')
 
