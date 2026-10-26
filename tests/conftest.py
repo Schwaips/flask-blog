@@ -1,9 +1,12 @@
 import os
 import tempfile
+from pathlib import Path
 
 import pytest
+from alembic import command
+from alembic.config import Config
 from flaskr import create_app
-from flaskr.db import get_db, init_db
+from flaskr.db import get_db, get_engine
 
 with open(os.path.join(os.path.dirname(__file__), 'data.sql'), 'rb') as f:
     _data_sql = f.read().decode('utf8')
@@ -20,13 +23,21 @@ def app():
     })
 
     with app.app_context():
-        init_db()
+        project_root = Path(__file__).resolve().parents[1]
+        config = Config(str(project_root / 'alembic.ini'))
+        # Keep pytest's logging handlers when Alembic loads env.py.
+        config.attributes['skip_logging_config'] = True
+        with get_engine().begin() as connection:
+            config.attributes['connection'] = connection
+            command.upgrade(config, 'head')
         get_db().executescript(_data_sql)
 
-    yield app
-
-    os.close(db_fd)
-    os.unlink(db_path)
+    try:
+        yield app
+    finally:
+        app.extensions['sqlalchemy_engine'].dispose()
+        os.close(db_fd)
+        os.unlink(db_path)
 
 
 @pytest.fixture

@@ -14,8 +14,13 @@ bp = Blueprint('blog', __name__)
 
 @bp.route('/')
 def index():
+    visibility = Post.is_published.is_(True)
+    if g.user is not None:
+        visibility = visibility | (Post.author_id == g.user.id)
+
     query = (
         select(Post)
+        .where(visibility)
         .options(joinedload(Post.author))
         .order_by(Post.created.desc())
     )
@@ -29,6 +34,7 @@ def create():
     if request.method == 'POST':
         title = request.form['title']
         body = request.form['body']
+        is_published = request.form.get('is_published') == 'on'
         error = None
 
         if not title:
@@ -42,6 +48,7 @@ def create():
               title=title,
               body=body,
               author_id=g.user.id,
+              is_published=is_published,
             )
             db.add(post)
             db.commit()
@@ -57,6 +64,7 @@ def update(id):
     if request.method == 'POST':
         title = request.form['title']
         body = request.form['body']
+        is_published = request.form.get('is_published') == 'on'
         error = None
 
         if not title:
@@ -68,6 +76,7 @@ def update(id):
             db = get_session()
             post.title = title
             post.body = body
+            post.is_published = is_published
             db.commit()
             return redirect(url_for('blog.index'))
 

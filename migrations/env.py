@@ -6,21 +6,23 @@ from flaskr.models import Base
 
 from alembic import context
 
-load_dotenv()
-app = create_app()
-engine = app.extensions["sqlalchemy_engine"]
-
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
-if config.config_file_name is not None:
+if config.config_file_name is not None and not config.attributes.get("skip_logging_config"):
     fileConfig(config.config_file_name)
 
 # Importing flaskr.models registers User and Post in this metadata.
 target_metadata = Base.metadata
+
+
+def get_migration_engine():
+    load_dotenv()
+    app = create_app()
+    return app.extensions["sqlalchemy_engine"]
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
@@ -41,7 +43,7 @@ def run_migrations_offline() -> None:
 
     """
     context.configure(
-        url=engine.url,
+        url=get_migration_engine().url,
         target_metadata=target_metadata,
         render_as_batch=True,
         literal_binds=True,
@@ -59,15 +61,28 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
-    with engine.connect() as connection:
-        context.configure(
-            connection=connection,
-            target_metadata=target_metadata,
-            render_as_batch=True,
-        )
+    connection = config.attributes.get("connection")
+    if connection is not None:
+        run_migrations_with_connection(connection)
+        return
 
-        with context.begin_transaction():
-            context.run_migrations()
+    engine = get_migration_engine()
+    try:
+        with engine.connect() as connection:
+            run_migrations_with_connection(connection)
+    finally:
+        engine.dispose()
+
+
+def run_migrations_with_connection(connection) -> None:
+    context.configure(
+        connection=connection,
+        target_metadata=target_metadata,
+        render_as_batch=True,
+    )
+
+    with context.begin_transaction():
+        context.run_migrations()
 
 
 if context.is_offline_mode():
