@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import ForeignKey, Text, TIMESTAMP, text
+from sqlalchemy import Boolean, ForeignKey, Text, TIMESTAMP, text, true
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .base import Base
 from .user import User
@@ -17,3 +17,6 @@ class Post(Base):
     )
     title: Mapped[str] = mapped_column(Text, nullable=False)
     body: Mapped[str] = mapped_column(Text, nullable=False)
+    is_published: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=true()
+    )

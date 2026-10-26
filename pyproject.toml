@@ -5,6 +5,7 @@ description = "The basic blog app built in the Flask tutorial."
 dependencies = [
     "flask",
     "SQLAlchemy>=2.0,<2.1",
+    "alembic",
 ]
 
 [build-system]

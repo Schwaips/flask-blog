@@ -13,6 +13,9 @@
       <header>
         <div>
           <h1>{{ post.title }}</h1>
+          {% if not post.is_published %}
+            <span>Brouillon</span>
+          {% endif %}
           <div class="about">by {{ post.author.username }} on {{ post.created.strftime('%Y-%m-%d') }}</div>
         </div>
         {% if g.user and g.user.id == post.author_id %}
